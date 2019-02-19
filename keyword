@@ -1,0 +1,818 @@
+#-*- coding: UTF-8 -*-
+#0  		FRGH    #2GRR-2A
+#1		    FRCD    #800RR-2A
+#2	    	FRKD    #15GRR-2A
+#3  		FRPE    #700RR-2A
+#4  		FREC    #17GSR2A
+#5 		    FRKB    #S15RR2A
+#6 	    	FRED    #S17RR2A
+#7 		    FZQD
+#8 	    	BRE
+#9		    LRE     #2GLR2AA
+#10 		FZQL
+#100		FHM
+#101		FHM_FRGH
+#102		FHM_FRCD
+#103		FHM_FRKD
+#104		FHM_FRPE
+#105		FHM_FREC
+#106		FHM_FRKB
+#107		FHM_FRED
+#108		FHM_FZQD
+#109		FHM_LRE
+#110		FHM_FZQL
+
+
+# import re
+#import string
+# import datetime
+#import sys,os
+# import time
+
+import random
+import socket
+import struct
+import paramiko
+import os
+import telnetlib
+import re
+
+
+def select_re_cpri(RE_list, CPRIlink_list,Wanted_Number, Wanted_RE, LBR='', exclude_CPRIlink_list=[]):
+#Define dictionary
+    RE_CPRI_Mapping = {}
+    lbr_cpri_list =   {}
+    lbr_cpri_list_len = {}
+
+    if len(RE_list) != len(CPRIlink_list):
+        return ''
+
+    if LBR.lower() == '1lbr' or LBR.lower() == '2lbr' or LBR.lower() == '3lbr' or LBR.lower() == '4lbr':
+        if (int(Wanted_Number) % int(LBR[0])) != 0:
+            return ''
+
+#delete exclude_cpri
+    for i in exclude_CPRIlink_list:
+        if i in CPRIlink_list[:]:
+            del RE_list[CPRIlink_list.index(i)]
+            CPRIlink_list.remove(i)
+
+# remove cprilink installed in other LBR
+    if LBR.lower() == 'lbr-0':
+        for i in CPRIlink_list[:]:
+            if ((i - 1) // 3) % 4 != 0:
+                del RE_list[CPRIlink_list.index(i)]
+                CPRIlink_list.remove(i)
+    elif LBR.lower() == 'lbr-1':
+        for i in CPRIlink_list[:]:
+            if ((i - 1) // 3) % 4 != 1:
+                del RE_list[CPRIlink_list.index(i)]
+                CPRIlink_list.remove(i)
+    elif LBR.lower() == 'lbr-2':
+        for i in CPRIlink_list[:]:
+            if ((i - 1) // 3) % 4 != 2:
+                del RE_list[CPRIlink_list.index(i)]
+                CPRIlink_list.remove(i)
+    elif LBR.lower() == 'lbr-3':
+        for i in CPRIlink_list[:]:
+            if ((i - 1) // 3) % 4 != 3:
+                del RE_list[CPRIlink_list.index(i)]
+                CPRIlink_list.remove(i)
+#Create dictionary for mapping cprilink and re type
+    for i in range(len(RE_list)):
+        if type(RE_list[i]) != str:
+            if RE_list[i] == 0:
+                #RE_CPRI_Mapping['FRGH'] = CPRIlink_list[i]
+                RE_CPRI_Mapping.setdefault('FRGH', []).append(str(CPRIlink_list[i]))
+            elif RE_list[i] == 1:
+                RE_CPRI_Mapping.setdefault('FRCD', []).append(str(CPRIlink_list[i]))
+            elif RE_list[i] == 2:
+                RE_CPRI_Mapping.setdefault('FRKD', []).append(str(CPRIlink_list[i]))
+            elif RE_list[i] == 3:
+                RE_CPRI_Mapping.setdefault('FRPE', []).append(str(CPRIlink_list[i]))
+            elif RE_list[i] == 4:
+                RE_CPRI_Mapping.setdefault('FREC', []).append(str(CPRIlink_list[i]))
+            elif RE_list[i] == 5:
+                RE_CPRI_Mapping.setdefault('FRKB', []).append(str(CPRIlink_list[i]))
+            elif RE_list[i] == 6:
+                RE_CPRI_Mapping.setdefault('FRED', []).append(str(CPRIlink_list[i]))
+            elif RE_list[i] == 7:
+                RE_CPRI_Mapping.setdefault('FZQD', []).append(str(CPRIlink_list[i]))
+            elif RE_list[i] == 10:
+                RE_CPRI_Mapping.setdefault('FZQL', []).append(str(CPRIlink_list[i]))
+            elif RE_list[i] == 11:
+                RE_CPRI_Mapping.setdefault('FHGD', []).append(str(CPRIlink_list[i]))
+            else:
+                RE_CPRI_Mapping.setdefault('Others', []).append(str(CPRIlink_list[i]))
+        else:
+            RE_CPRI_Mapping.setdefault(RE_list[i], []).append(str(CPRIlink_list[i]))
+#return wanted RE
+    if RE_CPRI_Mapping.has_key(Wanted_RE):
+        if int(Wanted_Number) <= len(RE_CPRI_Mapping[Wanted_RE]):
+            if LBR.lower() == '' or LBR.lower()=='lbr-0' or LBR.lower()=='lbr-1' or LBR.lower()=='lbr-2' or LBR.lower()=='lbr-3':
+                return random.sample(RE_CPRI_Mapping[Wanted_RE], int(Wanted_Number))
+
+            for i in RE_CPRI_Mapping[Wanted_RE]:
+                if ((int(i) - 1) // 3) % 4 == 0:
+                    lbr_cpri_list.setdefault('lbr-0', []).append(i)
+                elif ((int(i) - 1) // 3) % 4 == 1:
+                    lbr_cpri_list.setdefault('lbr-1', []).append(i)
+                elif ((int(i) - 1) // 3) % 4 == 2:
+                    lbr_cpri_list.setdefault('lbr-2', []).append(i)
+                elif ((int(i) - 1) // 3) % 4 == 3:
+                    lbr_cpri_list.setdefault('lbr-3', []).append(i)
+
+            for key in lbr_cpri_list.keys():
+                lbr_cpri_list_len[key] = len(lbr_cpri_list[key])
+            lbr_cpri_list_len_sort = sorted(lbr_cpri_list_len.items(), key=lambda d: d[1], reverse=True)
+            print lbr_cpri_list_len_sort
+            if LBR.lower()=='1lbr':
+                #if int(Wanted_Number) <= len(lbr_cpri_list[lbr_cpri_list_len_sort[0][0]]):
+                if int(Wanted_Number) <= lbr_cpri_list_len_sort[0][1]:
+                    return random.sample(lbr_cpri_list[lbr_cpri_list_len_sort[0][0]], int(Wanted_Number))
+            if LBR.lower()=='2lbr':
+                if int(Wanted_Number)/2 <= lbr_cpri_list_len_sort[1][1]:
+                    return random.sample(lbr_cpri_list[lbr_cpri_list_len_sort[0][0]], int(Wanted_Number)/2)+random.sample(lbr_cpri_list[lbr_cpri_list_len_sort[1][0]], int(Wanted_Number)/2)
+            if LBR.lower()=='3lbr':
+                if int(Wanted_Number)/3 <= lbr_cpri_list_len_sort[2][1]:
+                    return random.sample(lbr_cpri_list[lbr_cpri_list_len_sort[0][0]], int(Wanted_Number)/3)+random.sample(lbr_cpri_list[lbr_cpri_list_len_sort[1][0]], int(Wanted_Number)/3)+random.sample(lbr_cpri_list[lbr_cpri_list_len_sort[2][0]], int(Wanted_Number)/3)
+            if LBR.lower()=='4lbr':
+                if int(Wanted_Number)/4 <= lbr_cpri_list_len_sort[3][1]:
+                    return random.sample(lbr_cpri_list[lbr_cpri_list_len_sort[0][0]], int(Wanted_Number)/4)+random.sample(lbr_cpri_list[lbr_cpri_list_len_sort[1][0]], int(Wanted_Number)/4)+random.sample(lbr_cpri_list[lbr_cpri_list_len_sort[2][0]], int(Wanted_Number)/4)+random.sample(lbr_cpri_list[lbr_cpri_list_len_sort[3][0]], int(Wanted_Number)/4)
+    return ''
+
+def select_re_cpri_adv(RE_list, CPRIlink_list, Wanted_Number, Wanted_RE, LBR='', exclude_CPRIlink_list=[]):
+#Define dictionary
+
+    lbr_cpri_list_len = {'lbr-0':0, 'lbr-1':0, 'lbr-2':0, 'lbr-3':0}
+    cpri_link_property_list = []
+    cpri_link_property_list_sample = []
+    cpri_link_property_list_selected = []
+
+    if len(RE_list) != len(CPRIlink_list):
+        return ''
+
+#Create dictionary for mapping cprilink and re type
+    for i in range(len(RE_list)):
+        cpri_link_property = {}
+        if type(RE_list[i]) != str:
+            if RE_list[i] == 0:
+                cpri_link_property['re_type'] = 'FRGH'
+            elif RE_list[i] == 1:
+                cpri_link_property['re_type'] = 'FRCD'
+            elif RE_list[i] == 2:
+                cpri_link_property['re_type'] = 'FRKD'
+            elif RE_list[i] == 3:
+                cpri_link_property['re_type'] = 'FRPE'
+            elif RE_list[i] == 4:
+                cpri_link_property['re_type'] = 'FREC'
+            elif RE_list[i] == 5:
+                cpri_link_property['re_type'] = 'FRKB'
+            elif RE_list[i] == 6:
+                cpri_link_property['re_type'] = 'FRED'
+            elif RE_list[i] == 7:
+                cpri_link_property['re_type'] = 'FZQD'
+            elif RE_list[i] == 10:
+                cpri_link_property['re_type'] = 'FZQL'
+            elif RE_list[i] == 11:
+                cpri_link_property['re_type'] = 'FHGD'
+            else:
+                cpri_link_property['re_type'] = 'Others'
+        else:
+            cpri_link_property['re_type'] = RE_list[i]
+        cpri_link_property['cpri_id'] = CPRIlink_list[i]
+        cpri_link_property['lbr_id'] = cpri_mapping_to_LBR(CPRIlink_list[i])
+        cpri_link_property['3g_mode'] = cpri_mapping_to_dual_mode(RE_list[i])
+        cpri_link_property['duplex_type'] = cpri_mapping_to_duplex_type(RE_list[i])
+        cpri_link_property_list.append(cpri_link_property)
+    print cpri_link_property_list
+#exclude unwanted RE
+    if Wanted_RE != '':
+        for i in cpri_link_property_list[:]:
+            if Wanted_RE not in i.values():
+                cpri_link_property_list.remove(i)
+    if LBR.lower() == 'lbr-0' or LBR.lower() == 'lbr-1' or LBR.lower() == 'lbr-2' or LBR.lower() == 'lbr-3':
+        for i in cpri_link_property_list[:]:
+            if LBR not in i.values():
+                cpri_link_property_list.remove(i)
+    if exclude_CPRIlink_list != '':
+        for i in cpri_link_property_list[:]:
+            if i['cpri_id'] in exclude_CPRIlink_list:
+                cpri_link_property_list.remove(i)
+#return wanted RE when lbr is null
+    for i in cpri_link_property_list:
+        cpri_link_property_list_sample.append(i['cpri_id'])
+    if LBR=='':
+        cpri_link_property_list_selected = random.sample(cpri_link_property_list_sample, int(Wanted_Number))
+        for i in cpri_link_property_list_selected:
+            del RE_list[CPRIlink_list.index(i)]
+            CPRIlink_list.remove(i)
+        return cpri_link_property_list_selected
+#return wanted RE when lbr is 1lbr,2lbr....
+    for i in cpri_link_property_list:
+        if i['lbr_id'] == 'lbr-0':
+            lbr_cpri_list_len['lbr-0'] = lbr_cpri_list_len['lbr-0'] + 1
+        if i['lbr_id'] == 'lbr-1':
+            lbr_cpri_list_len['lbr-1'] = lbr_cpri_list_len['lbr-1'] + 1
+        if i['lbr_id'] == 'lbr-2':
+            lbr_cpri_list_len['lbr-2'] = lbr_cpri_list_len['lbr-2'] + 1
+        if i['lbr_id'] == 'lbr-3':
+            lbr_cpri_list_len['lbr-3'] = lbr_cpri_list_len['lbr-3'] + 1
+    lbr_cpri_list_len_sort = sorted(lbr_cpri_list_len.items(), key=lambda d: d[1], reverse=True)
+
+    if LBR.lower() == '1lbr':
+        for i in cpri_link_property_list:
+            if i['lbr_id'] == lbr_cpri_list_len_sort[0][0]:
+                cpri_link_property_list_sample.append(i['cpri_id'])
+        cpri_link_property_list_selected = random.sample(cpri_link_property_list_sample, int(Wanted_Number))
+        for i in cpri_link_property_list_selected:
+            del RE_list[CPRIlink_list.index(i)]
+            CPRIlink_list.remove(i)
+        return cpri_link_property_list_selected
+
+    return cpri_link_property_list
+
+def set_multicpri_dip_switch(DipON_CPRI):
+# read sync mode
+    s = paramiko.SSHClient()
+#    s.load_system_host_keys()
+    s.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    LCP = get_active_lcp_id()
+    if  LCP == 'lcp-0':
+        s.connect('192.168.129.2', 22, 'toor4nsn', 'oZPS0POrRieRtu', timeout=4)
+    else:
+        s.connect('192.168.130.10', 22, 'toor4nsn', 'oZPS0POrRieRtu', timeout=4)
+
+    stdin, stdout, stderr = s.exec_command("cat /pns/vendorFM/n/dip-sw_setting.bin")
+    iMode = int(stdout.read())
+    s.close()
+# set cprilink state according input DipON_CPRI parameter
+    cpri_num_state = [0] * 49
+    print DipON_CPRI
+    for i in DipON_CPRI:
+        cpri_num_state[int(i)] = 1
+
+    msg = struct.pack("!bbbbi50h",
+                          0x00,
+                          0x6a,
+                          0x22,
+                          0,
+                          0,
+                          cpri_num_state[1],  cpri_num_state[2],  cpri_num_state[3],  cpri_num_state[4],
+                          cpri_num_state[5],  cpri_num_state[6],  cpri_num_state[7],  cpri_num_state[8],
+                          cpri_num_state[9],  cpri_num_state[10], cpri_num_state[11], cpri_num_state[12],
+                          cpri_num_state[13], cpri_num_state[14], cpri_num_state[15], cpri_num_state[16],
+                          cpri_num_state[17], cpri_num_state[18], cpri_num_state[19], cpri_num_state[20],
+                          cpri_num_state[21], cpri_num_state[22], cpri_num_state[23], cpri_num_state[24],
+                          cpri_num_state[25], cpri_num_state[26], cpri_num_state[27], cpri_num_state[28],
+                          cpri_num_state[29], cpri_num_state[30], cpri_num_state[31], cpri_num_state[32],
+                          cpri_num_state[33], cpri_num_state[34], cpri_num_state[35], cpri_num_state[36],
+                          cpri_num_state[37], cpri_num_state[38], cpri_num_state[39], cpri_num_state[40],
+                          cpri_num_state[41], cpri_num_state[42], cpri_num_state[43], cpri_num_state[44],
+                          cpri_num_state[45], cpri_num_state[46], cpri_num_state[47], cpri_num_state[48],
+                          iMode,
+                          0)
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    if LCP == 'lcp-0':
+        os.system("sudo route del 192.168.1.133")
+        os.system("sudo route add -net 192.168.1.133 netmask 255.255.255.255 gw 192.168.129.3")
+        s.connect(('192.168.1.133', 5200))
+    else:
+        os.system("sudo route del 192.168.1.133")
+        os.system("sudo route add -net 192.168.1.133 netmask 255.255.255.255 gw 192.168.130.11")
+        s.connect(('192.168.1.133', 5200))
+    s.send(msg)
+    s.close()
+    return 'Pass'
+
+def check_file_size_is_not_zero(filepath):
+    size = os.path.getsize(filepath)
+    if size == 0:
+        return "File Size is Zero"
+    elif size <> 0:
+        return "File Size is OK"
+
+def set_lte_sdata_sep_parameter_file_for_cpri(cprilink={}):
+    re_type = cprilink['RE_type']
+    cprilink_id = cprilink['CPRI_ID']
+    if 'FHM' in re_type:
+        re_type = re_type[4:]
+    if not cprilink.has_key('lte_bandwidth'):
+        lte_bandwidth = ''
+    else:
+        lte_bandwidth = cprilink['lte_bandwidth']
+    if not cprilink.has_key('wcdma_bts_id'):
+        wcdma_bts_id = ''
+    else:
+        wcdma_bts_id = cprilink['wcdma_bts_id']
+    if not cprilink.has_key('if_bit_rate'):
+        if_bit_rate = ''
+    else:
+        if_bit_rate = cprilink['if_bit_rate']
+    if not cprilink.has_key('number_of_transmission_systems'):
+        number_of_transmission_systems = ''
+    else:
+        number_of_transmission_systems = cprilink['number_of_transmission_systems']
+    wcdma_carrier = ''
+    with open('/opt/ute/lte_sdata_sep_parameterfile.txt', 'a') as lte_sdata_sep_parameterfile:
+        if isinstance(cprilink_id,str):
+            cprilink_id = cprilink_id.split()
+        for i in cprilink_id:
+            if re_type == 'FRCD':
+                if lte_bandwidth == '' or int(lte_bandwidth) >= 3:
+                    lte_bandwidth = '3'
+                    wcdma_carrier = '0'
+                elif lte_bandwidth == '0':
+                    wcdma_carrier = '3'
+                elif lte_bandwidth == '1':
+                    wcdma_carrier = '3'
+                elif lte_bandwidth == '2':
+                    wcdma_carrier = '1'
+                if_bit_rate = '0'
+                number_of_transmission_systems = '0'
+            elif re_type == 'FRGH' or re_type == 'FHGD':
+                if lte_bandwidth == '' or int(lte_bandwidth) >= 4:
+                    lte_bandwidth = '4'
+                    wcdma_carrier = '0'
+                elif lte_bandwidth == '0':
+                    wcdma_carrier = '3'
+                elif lte_bandwidth == '1':
+                    wcdma_carrier = '3'
+                elif lte_bandwidth == '2':
+                    wcdma_carrier = '3'
+                elif lte_bandwidth == '3':
+                    wcdma_carrier = '1'
+                if_bit_rate = '0'
+                number_of_transmission_systems = '0'
+            elif re_type == 'BRE':
+                if lte_bandwidth == '' or int(lte_bandwidth) >= 4:
+                    lte_bandwidth = '4'
+                    wcdma_carrier = '0'
+                elif lte_bandwidth == '0':
+                    wcdma_carrier = '3'
+                elif lte_bandwidth == '1':
+                    wcdma_carrier = '3'
+                elif lte_bandwidth == '2':
+                    wcdma_carrier = '3'
+                elif lte_bandwidth == '3':
+                    wcdma_carrier = '1'
+                if_bit_rate = '0'
+                number_of_transmission_systems = '0'
+                lte_sdata_sep_parameterfile.write('2	High-density\\CPRI link information #' + i + '\\Active link group number' + '\n')
+            elif re_type == 'FZQD' or re_type == 'FZQL':
+                if lte_bandwidth == '':
+                    lte_bandwidth = '4'
+                wcdma_carrier = '0'
+                if if_bit_rate == '':
+                    if_bit_rate = '2'
+                if number_of_transmission_systems == '':
+                    number_of_transmission_systems = '1'
+                lte_sdata_sep_parameterfile.write('65535	CPRI #' + i + '\Variable name D\Firmware transmission check timer' + '\n')
+                lte_sdata_sep_parameterfile.write('65535	CPRI #' + i + '\Variable name F\Firmware transmission check timer (for update)' + '\n')
+            elif re_type == 'FRKB' or re_type == 'FRKD':
+                if lte_bandwidth == '' or int(lte_bandwidth) >= 3:
+                    lte_bandwidth = '3'
+                wcdma_carrier = '0'
+                if_bit_rate = '0'
+                number_of_transmission_systems = '0'
+            elif re_type == 'FREC' or re_type=='FRED':
+                if lte_bandwidth == '' or int(lte_bandwidth) >= 4:
+                    lte_bandwidth = '4'
+                wcdma_carrier = '0'
+                if_bit_rate = '0'
+                number_of_transmission_systems = '0'
+            elif re_type == 'FRPE':
+                if lte_bandwidth == '' or int(lte_bandwidth) >= 2:
+                    lte_bandwidth = '2'
+                wcdma_carrier = '0'
+                if_bit_rate = '0'
+                number_of_transmission_systems = '0'
+            if wcdma_bts_id == '':
+                wcdma_carrier = '0'
+            lte_sdata_sep_parameterfile.write(lte_bandwidth + '	CPRI #' + i + '\Variable name E\LTE bandwidth' + '\n')
+            lte_sdata_sep_parameterfile.write(wcdma_carrier + '	CPRI #' + i + '\Variable name E\\3G carrier operation status' + '\n')
+            lte_sdata_sep_parameterfile.write(if_bit_rate + '	High-density\CPRI link information #' + i + '\CPRI_IF bit rate' + '\n')
+            lte_sdata_sep_parameterfile.write(number_of_transmission_systems + '	CPRI #' + i + '\Variable name E\Number of transmission systems' + '\n')
+            cprilink['wcdma_carrier'] = wcdma_carrier
+            print cprilink
+            if int(i) <= 24:
+                set_3G_sdata_sep_parameter_file_for_cpri(cprilink)
+    return 'Pass'
+def set_3G_sdata_sep_parameter_file_for_cpri(cprilink_for_3G={}):
+    cprilink_3G = cprilink_for_3G['CPRI_ID']
+    re_type_3G = cprilink_for_3G['RE_type']
+    if not cprilink_for_3G.has_key('wcdma_bts_id'):
+        wcdma_bts_id = ''
+    else:
+        wcdma_bts_id = cprilink_for_3G['wcdma_bts_id']
+    if not cprilink_for_3G.has_key('wcdma_carrier'):
+        wcdma_carrier_3G = '0'
+    else:
+        wcdma_carrier_3G = cprilink_for_3G['wcdma_carrier']
+    print cprilink_for_3G
+    if wcdma_bts_id == '1':
+        print 'bts1111111111111111111111111111111'
+        with open('/opt/ute/3G_sdata_s1p_parameterfile.txt', 'a') as s1p_sdata_sep_parameterfile:
+            if isinstance(cprilink_3G,str):
+                cprilink_3G = cprilink_3G.split()
+            for i in cprilink_3G:
+                if wcdma_carrier_3G == '0':
+                    print 'prach and cpri set 0'
+                    s1p_sdata_sep_parameterfile.write('0	キャリア運用CPRIリンク情報（セクタ' + cpri_id_to_3G_sector_id(i) + '）\n')
+                    s1p_sdata_sep_parameterfile.write('39185	セクタ' + cpri_id_to_3G_sector_id(i) + ' PRACHチャネル数\n')
+                elif wcdma_carrier_3G == '1':
+                    print 'prach and cpri set 1'
+                    s1p_sdata_sep_parameterfile.write(single_3G_carrrier_number_to_3G_sdata_value(i) + '	キャリア運用CPRIリンク情報（セクタ' + cpri_id_to_3G_sector_id(i) + '）\n')
+                    s1p_sdata_sep_parameterfile.write('39193	セクタ' + cpri_id_to_3G_sector_id(i) + ' PRACHチャネル数\n')
+                elif wcdma_carrier_3G == '3':
+                    print 'prach and cpri set 3'
+                    s1p_sdata_sep_parameterfile.write(two_3G_carrrier_number_to_3G_sdata_value(i) + '	キャリア運用CPRIリンク情報（セクタ' + cpri_id_to_3G_sector_id(i) + '）\n')
+                    s1p_sdata_sep_parameterfile.write('39321	セクタ' + cpri_id_to_3G_sector_id(i) + ' PRACHチャネル数\n')
+                if re_type_3G == 'BRE':
+                    print 'Set BRE open'
+                    s1p_sdata_sep_parameterfile.write(single_BRE_amp_number_to_3G_sdata_value(i) + '	AMP接続情報（セクタ' + cpri_id_to_3G_sector_id(i) + '）\n')
+                else:
+                    print 'set BRE close'
+                    s1p_sdata_sep_parameterfile.write('0	AMP接続情報（セクタ' + cpri_id_to_3G_sector_id(i) + '）\n')
+    if wcdma_bts_id == '2':
+        print 'bts222222222222222222222222222'
+        with open('/opt/ute/3G_sdata_s2p_parameterfile.txt', 'a') as s2p_sdata_sep_parameterfile:
+            if isinstance(cprilink_3G,str):
+                cprilink_3G = cprilink_3G.split()
+            for i in cprilink_3G:
+                if wcdma_carrier_3G == '0':
+                    s2p_sdata_sep_parameterfile.write('0	キャリア運用CPRIリンク情報（セクタ' + cpri_id_to_3G_sector_id(i) + '）\n')
+                    s2p_sdata_sep_parameterfile.write('39185	セクタ' + cpri_id_to_3G_sector_id(i) + ' PRACHチャネル数\n')
+                elif wcdma_carrier_3G == '1':
+                    s2p_sdata_sep_parameterfile.write(single_3G_carrrier_number_to_3G_sdata_value(i) + '	キャリア運用CPRIリンク情報（セクタ' + cpri_id_to_3G_sector_id(i) + '）\n')
+                    s2p_sdata_sep_parameterfile.write('39193	セクタ' + cpri_id_to_3G_sector_id(i) + ' PRACHチャネル数\n')
+                elif wcdma_carrier_3G == '3':
+                    s2p_sdata_sep_parameterfile.write(two_3G_carrrier_number_to_3G_sdata_value(i) + '	キャリア運用CPRIリンク情報（セクタ' + cpri_id_to_3G_sector_id(i) + '）\n')
+                    s2p_sdata_sep_parameterfile.write('39321	セクタ' + cpri_id_to_3G_sector_id(i) + ' PRACHチャネル数\n')
+                if re_type_3G == 'BRE':
+                    s2p_sdata_sep_parameterfile.write(single_BRE_amp_number_to_3G_sdata_value(i) + '	AMP接続情報（セクタ' + cpri_id_to_3G_sector_id(i) + '）\n')
+                else:
+                    s2p_sdata_sep_parameterfile.write('0	AMP接続情報（セクタ' + cpri_id_to_3G_sector_id(i) + '）\n')
+    if wcdma_bts_id == '0':
+        print 'bts000000000000000000000000000000'
+        with open('/opt/ute/3G_sdata_sap_parameterfile.txt', 'a') as sap_sdata_sep_parameterfile:
+            if isinstance(cprilink_3G,str):
+                cprilink_3G = cprilink_3G.split()
+            for i in cprilink_3G:
+                if wcdma_carrier_3G == '0':
+                    sap_sdata_sep_parameterfile.write('0	キャリア運用CPRIリンク情報（セクタ' + cpri_id_to_3G_sector_id(i) + '）\n')
+                elif wcdma_carrier_3G == '1':
+                    sap_sdata_sep_parameterfile.write(single_3G_carrrier_number_to_3G_sdata_value(i) + '	キャリア運用CPRIリンク情報（セクタ' + cpri_id_to_3G_sector_id(i) + '）\n')
+                elif wcdma_carrier_3G == '3':
+                    sap_sdata_sep_parameterfile.write(two_3G_carrrier_number_to_3G_sdata_value(i) + '	キャリア運用CPRIリンク情報（セクタ' + cpri_id_to_3G_sector_id(i) + '）\n')
+                if re_type_3G == 'BRE':
+                    sap_sdata_sep_parameterfile.write(single_BRE_amp_number_to_3G_sdata_value(i) + '	AMP接続情報（セクタ' + cpri_id_to_3G_sector_id(i) + '）\n')
+                else:
+                    sap_sdata_sep_parameterfile.write('0	AMP接続情報（セクタ' + cpri_id_to_3G_sector_id(i) + '）\n')
+
+def set_3G_sdata_s1p_parameter_file_for_trans():
+    with open('/opt/ute/3G_sdata_s1p_parameterfile.txt', 'a') as s1p_sdata_sep_parameterfile:
+        s1p_sdata_sep_parameterfile.write('10.69.196.207	物理回線#0 Source IP Address\n')
+        s1p_sdata_sep_parameterfile.write('172.24.100.201	物理回線#1 Source IP Address\n')
+        s1p_sdata_sep_parameterfile.write('10.69.196.226	Node Synchronization用Destination IP Address#1\n')
+        s1p_sdata_sep_parameterfile.write('10.69.196.227	Node Synchronization用Destination IP Address#2\n')
+        s1p_sdata_sep_parameterfile.write('10.69.196.254	物理回線#0 Default Gateway IP Address\n')
+        s1p_sdata_sep_parameterfile.write('172.24.100.254	物理回線#1 Default Gateway IP Address\n')
+def set_3G_sdata_s2p_parameter_file_for_trans():
+    with open('/opt/ute/3G_sdata_s2p_parameterfile.txt', 'a') as s2p_sdata_sep_parameterfile:
+        s2p_sdata_sep_parameterfile.write('10.69.197.207	物理回線#0 Source IP Address\n')
+        s2p_sdata_sep_parameterfile.write('172.24.101.201	物理回線#1 Source IP Address\n')
+        s2p_sdata_sep_parameterfile.write('10.69.197.226	Node Synchronization用Destination IP Address#1\n')
+        s2p_sdata_sep_parameterfile.write('10.69.197.227	Node Synchronization用Destination IP Address#2\n')
+        s2p_sdata_sep_parameterfile.write('10.69.197.254	物理回線#0 Default Gateway IP Address\n')
+        s2p_sdata_sep_parameterfile.write('172.24.101.254	物理回線#1 Default Gateway IP Address\n')
+def cpri_id_to_3G_sector_id(a):
+    if int(a)%6 != 0:
+        return str(int(a)%6)
+    else:
+        return '6'
+
+def single_3G_carrrier_number_to_3G_sdata_value(b):
+    if int(b)%6 == 0:
+        return str(int(str(int(b)/6),16))
+    else:
+        return str(int(str(1 + int(b)/6),16))
+
+def two_3G_carrrier_number_to_3G_sdata_value(c):
+    if int(c)%6 == 0:
+        return str(int(str(int(c)/6) + str(int(c)/6),16))
+    else:
+        return str(int(str(1 + int(c)/6) + str(1 + int(c)/6),16))
+def single_BRE_amp_number_to_3G_sdata_value(d):
+    if int(d)%6 == 0:
+        return str(int(str(int(d)/6),16))
+    else:
+        return str(int(str(1 + int(d)/6),16))
+
+def set_lte_sdata_sep_parameter_file_for_sc(sc_info={}):
+    sc_number = sc_info['SC_ID']
+    RE_type = sc_info['RE_type']
+    if not sc_info.has_key('FlagCSI_rs4tx'):
+        flagCSI_rs4tx = ''
+    else:
+        flagCSI_rs4tx = sc_info['FlagCSI_rs4tx']
+    if not sc_info.has_key('Operated_RE_number'):
+        operated_RE_number = ''
+    else:
+        operated_RE_number = sc_info['Operated_RE_number']
+    if not sc_info.has_key('Cpri_link_number_1'):
+        cpri_link_number_1 = ''
+    else:
+        cpri_link_number_1 = sc_info['Cpri_link_number_1']
+    if not sc_info.has_key('Cpri_link_number_2'):
+        cpri_link_number_2 = ''
+    else:
+        cpri_link_number_2  = sc_info['Cpri_link_number_2']
+    with open('/opt/ute/lte_sdata_sep_parameterfile.txt', 'a') as lte_sdata_sep_parameterfile:
+        if isinstance(sc_number,str):
+            sc_number = sc_number.split()
+        for i in sc_number:
+            if RE_type == 'FZQD' or RE_type == 'FZQL':
+                duplex_type = '1'
+            else:
+                duplex_type = '0'
+            if flagCSI_rs4tx == '':
+                if duplex_type == '0':
+                    flagCSI_rs4tx = '0'
+                elif duplex_type == '1':
+                    flagCSI_rs4tx = '1'
+            if operated_RE_number == '' or operated_RE_number == '1':
+                cpri_link_number_2 = '0'
+                operated_RE_number = '1'
+            if cpri_link_number_1 == '':
+                    cpri_link_number_1 = i
+            lte_sdata_sep_parameterfile.write(duplex_type + '	High-density\Sector/carrier #' + i + '\TDD_FDD related information\Duplex type' + '\n')
+            if int(i) <= 12:
+                lte_sdata_sep_parameterfile.write(flagCSI_rs4tx + '	TM9 related information\sector?carrier information #' + i + '\CSI-RS reated information\FlagCSI-RS4Tx' + '\n')
+            else:
+                lte_sdata_sep_parameterfile.write(flagCSI_rs4tx + '	TM9 related information\sector?carrier information #' + i + '\PTP Master Clock#4\FlagCSI-RS4Tx' + '\n')
+            lte_sdata_sep_parameterfile.write(operated_RE_number + '	High-density\Sector/carrier #' + i + '\TDD_RE related information\Operated RE number' + '\n')
+            lte_sdata_sep_parameterfile.write(cpri_link_number_1 + '	High-density\Sector/carrier #' + i + '\TDD_RE related information\CPRI link number #1' + '\n')
+            lte_sdata_sep_parameterfile.write(cpri_link_number_2 + '	High-density\Sector/carrier #' + i + '\TDD_RE related information\CPRI link number #2' + '\n')
+    return 'Pass'
+
+def cpri_mapping_to_LBR(cpri):
+    LBR_ID = ((int(cpri) - 1) // 3) % 4
+    return 'lbr-' + str(LBR_ID)
+
+def cpri_mapping_to_SectorCarrier(cpri):
+    SectorCarrier = []
+    for carrier in range(1,9):
+        for sector in range(1,7):
+            print sector
+            print carrier
+            if ((carrier -1) * 6 + sector) == int(cpri):
+                SectorCarrier.append(str(sector))
+                SectorCarrier.append(str(carrier))
+    return SectorCarrier
+def cpri_mapping_to_dual_mode(cpri):
+    if 'FHM' in cpri:
+        cpri = cpri[4:]
+    if cpri == 'FRGH':
+        return 'dual_mode'
+    elif cpri== 'FRCD':
+        return 'dual_mode'
+    elif cpri == 'FRKD':
+        return 'single_mode'
+    elif cpri== 'FRPE':
+        return 'single_mode'
+    elif cpri== 'FREC':
+        return 'single_mode'
+    elif cpri== 'FRKB':
+        return 'single_mode'
+    elif cpri== 'FRED':
+        return 'single_mode'
+    elif cpri== 'FZQD':
+        return 'single_mode'
+    elif cpri== 'FZQL':
+        return 'single_mode'
+    elif cpri== 'FHGD':
+        return 'dual_mode'
+    else:
+        return 'unknow'
+def cpri_mapping_to_duplex_type(cpri):
+    if 'FHM' in cpri:
+        cpri = cpri[4:]
+    if cpri == 'FRGH':
+        return 'fdd'
+    elif cpri== 'FRCD':
+        return 'fdd'
+    elif cpri == 'FRKD':
+        return 'fdd'
+    elif cpri== 'FRPE':
+        return 'fdd'
+    elif cpri== 'FREC':
+        return 'fdd'
+    elif cpri== 'FRKB':
+        return 'fdd'
+    elif cpri== 'FRED':
+        return 'fdd'
+    elif cpri== 'FZQD':
+        return 'tdd'
+    elif cpri== 'FZQL':
+        return 'tdd'
+    elif cpri== 'FHGD':
+        return 'fdd'
+    else:
+        return 'unknow'
+def list_sort_by_number(list):
+    tmp = [int(i) for i in list]
+    tmp.sort()
+    return [str(i) for i in tmp]
+
+
+
+
+def intial_lte_sdata_sep_parameter_file_for_cpri_sc(intial_cpri_list=[], intial_re_type=[]):
+    intial_cprilink = {}
+    # for n in range(0,len(intial_cpri_list)):
+    for n in range(1, 49):
+        intial_cprilink.clear()
+        if str(n) in intial_cpri_list:
+            intial_cprilink['RE_type'] = intial_re_type[intial_cpri_list.index(str(n))]
+            intial_cprilink['CPRI_ID'] = str(n)
+            intial_cprilink['SC_ID'] = str(n)
+            # intial_cprilink.setdefault('RE_type', []).append(intial_re_type[n])
+            # intial_cprilink.setdefault('ID', []).append(intial_cpri_list[n])
+        else:
+            intial_cprilink['RE_type'] = 'FRGH'
+            intial_cprilink['CPRI_ID'] = str(n)
+            intial_cprilink['SC_ID'] = str(n)
+        set_lte_sdata_sep_parameter_file_for_cpri(intial_cprilink)
+        set_lte_sdata_sep_parameter_file_for_sc(intial_cprilink)
+    for n in range(1,7):
+        intial_cprilink.clear()
+        intial_cprilink['RE_type'] = 'FRGH'
+        intial_cprilink['CPRI_ID'] = str(n)
+        intial_cprilink['wcdma_carrier'] = '0'
+        for i in range(0,3):
+            intial_cprilink['wcdma_bts_id'] = str(i)
+            set_3G_sdata_sep_parameter_file_for_cpri(intial_cprilink)
+
+def set_lte_sdata_sep_parameter_file_for_dual_mode(mode='dual'):
+    with open('/opt/ute/lte_sdata_sep_parameterfile.txt', 'a') as lte_sdata_sep_parameterfile:
+        if mode.lower() == 'single':
+            lte_sdata_sep_parameterfile.write('0	HD parameter\\eNB device information\\3G-AP startup flag' + '\n')
+        else:
+            lte_sdata_sep_parameterfile.write('1	HD parameter\\eNB device information\\3G-AP startup flag' + '\n')
+
+def set_lte_sdata_sep_parameter_file_for_2bts_mode(mode='2bts'):
+    with open('/opt/ute/lte_sdata_sep_parameterfile.txt', 'a') as lte_sdata_sep_parameterfile:
+        if mode.lower() == '1bts':
+            lte_sdata_sep_parameterfile.write('0	HD parameter\\eNB device information\\2 BTS mode activation flag\n')
+        else:
+            lte_sdata_sep_parameterfile.write('1	HD parameter\\eNB device information\\2 BTS mode activation flag\n')
+
+def get_active_lcp_id_bak():
+    try:
+        tn = telnetlib.Telnet('192.168.129.2', port=15007, timeout=2)
+    except:
+        print 'lcp-0 cannot connected, try to connect to lcp-1'
+        tn = telnetlib.Telnet('192.168.130.10', port=15007, timeout=2)
+    out = tn.read_until('AaShell> ', timeout=1)
+    tn.write('card state show all @BTSOMexe\n')
+    out = tn.read_until('AaShell> ', timeout=1)
+    tn.write('quit\n')
+    tn.close()
+    print out
+    line = re.findall('lcp.*NE_ACT', out)
+    if 'lcp-0' in re.findall('lcp-.', line[0]):
+        return 'lcp-0'
+    elif 'lcp-1' in re.findall('lcp-.', line[0]):
+        return 'lcp-1'
+
+def get_active_lcp_info(ip_addr):
+    try:
+        tn = telnetlib.Telnet(ip_addr, port=15007, timeout=2)
+        out = tn.read_until('AaShell> ', timeout=1)
+        tn.write('card state show all @BTSOMexe\n')
+        out = tn.read_until('AaShell> ', timeout=1)
+        tn.write('quit\n')
+        tn.close()
+    except:
+        out = ''
+    print out
+    line = re.findall('lcp.*NE_ACT', out)
+    if not len(line):
+        return ''
+    elif 'lcp-0' in re.findall('lcp-.', line[0]):
+        return 'lcp-0'
+    elif 'lcp-1' in re.findall('lcp-.', line[0]):
+        return 'lcp-1'
+def get_active_lcp_id():
+    lcp_info = get_active_lcp_info('192.168.129.2')
+    if not len(lcp_info):
+        lcp_info = get_active_lcp_info('192.168.130.10')
+    return lcp_info
+
+def get_active_lte_lsp_list():
+    lsp_id = []
+    try:
+        tn = telnetlib.Telnet('192.168.129.2', port=15007, timeout=2)
+    except:
+        print 'lcp-0 cannot connected, try to connect to lcp-1'
+        tn = telnetlib.Telnet('192.168.130.10', port=15007, timeout=2)
+    out = tn.read_until('AaShell> ', timeout=1)
+    tn.write('card state show all @BTSOMexe\n')
+    out = tn.read_until('AaShell> ', timeout=1)
+    tn.write('quit\n')
+    tn.close()
+    line = re.findall('lsp.*ACT.*LTE', out)
+    for i in line:
+        lsp_id.append('lsp-' + i[4:6])
+    return lsp_id
+
+def get_active_3g_lsp_list():
+    lsp_id = []
+    try:
+        tn = telnetlib.Telnet('192.168.129.2', port=15007, timeout=2)
+    except:
+        print 'lcp-0 cannot connected, try to connect to lcp-1'
+        tn = telnetlib.Telnet('192.168.130.10', port=15007, timeout=2)
+    out = tn.read_until('AaShell> ', timeout=1)
+    tn.write('card state show all @BTSOMexe\n')
+    out = tn.read_until('AaShell> ', timeout=1)
+    tn.write('quit\n')
+    tn.close()
+    line_3G_BB = re.findall('lsp.*3G', out)
+    line_3G_bts1 = re.findall('lsp.*bts1', out)
+    line_3G_bts2 = re.findall('lsp.*bts2', out)
+    if len(line_3G_bts1) != 0:
+        lsp_id.append(line_3G_bts1[0][:5])
+    if len(line_3G_bts2) != 0:
+        lsp_id.append(line_3G_bts2[0][:5])
+    for i in line_3G_BB:
+        lsp_id.append('lsp-' + i[4:6])
+    return lsp_id
+
+def get_active_3g_lsp_list_for_bts():
+    wcdma_bts_0_lsp_id = []
+    wcdma_bts_1_lsp_id = []
+    wcdma_bts_2_lsp_id = []
+    lsp_id = []
+    try:
+        tn = telnetlib.Telnet('192.168.129.2', port=15007, timeout=2)
+    except:
+        print 'lcp-0 cannot connected, try to connect to lcp-1'
+        tn = telnetlib.Telnet('192.168.130.10', port=15007, timeout=2)
+    out = tn.read_until('AaShell> ', timeout=1)
+    tn.write('card state show all @BTSOMexe\n')
+    out = tn.read_until('AaShell> ', timeout=1)
+    tn.write('quit\n')
+    tn.close()
+    line_3G_bts0 = re.findall('lsp.*3G', out)
+    line_3G_bts1 = re.findall('lsp.*bts1', out)
+    line_3G_bts2 = re.findall('lsp.*bts2', out)
+    if len(line_3G_bts0) != 0:
+        for i in line_3G_bts0:
+            wcdma_bts_0_lsp_id.append(i[:5])
+    if len(line_3G_bts1) != 0:
+        for i in line_3G_bts1:
+            wcdma_bts_1_lsp_id.append(i[:5])
+    if len(line_3G_bts2) != 0:
+        for i in line_3G_bts2:
+            wcdma_bts_2_lsp_id.append(i[:5])
+    lsp_id = wcdma_bts_0_lsp_id, wcdma_bts_1_lsp_id, wcdma_bts_2_lsp_id
+    print lsp_id
+    return lsp_id
+
+def get_card_slot_id(card_id):
+    print card_id
+    if 'lcp' in card_id:
+        if int(card_id[4:]) == 0:
+            return '1'
+        elif int(card_id[4:]) == 1:
+            return '15'
+    elif 'lsp' in card_id:
+        if int(card_id[4:]) <=7 and int(card_id[4:]) >=0:
+            return str(int(card_id[4:]) + 2)
+        elif int(card_id[4:]) <=15 and int(card_id[4:]) >=8:
+            return str(int(card_id[4:]) + 8)
+    elif 'lbr' in card_id:
+        if int(card_id[4:]) <=1 and int(card_id[4:]) >=0:
+            return str(int(card_id[4:]) + 30)
+        elif int(card_id[4:]) <=3 and int(card_id[4:]) >=2:
+            return str(int(card_id[4:]) + 31)
+
+
+def get_wcdma_carrier_number(re_type='FRGH', lte_bandwidth=''):
+    if re_type == 'FRCD':
+        if lte_bandwidth == '' or int(lte_bandwidth) >= 3:
+            wcdma_carrier_number = '0'
+        elif lte_bandwidth == '0' or lte_bandwidth == '1':
+            wcdma_carrier_number = '2'
+        elif lte_bandwidth == '2':
+            wcdma_carrier_number = '1'
+    elif re_type == 'FRGH' or re_type == 'BRE' or re_type == 'FHGD':
+        if lte_bandwidth == '' or int(lte_bandwidth) >= 4:
+            wcdma_carrier_number = '0'
+        elif lte_bandwidth == '0' or lte_bandwidth == '1' or lte_bandwidth == '2':
+            wcdma_carrier_number = '2'
+        elif lte_bandwidth == '3':
+            wcdma_carrier_number = '1'
+    return wcdma_carrier_number
