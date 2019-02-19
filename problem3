@@ -1,0 +1,132 @@
+有不定长度A座位的火车，每个座位只能坐一个人，座位编号从1到A。A>=1.
+从车头到车尾是有序编号的。
+有若干家庭需要坐车，家庭数是B， B>=1。
+每个家庭含家庭成员若干，此数是个1到N的任意数。
+上车时，一个家庭的所有成员必须连续坐在一起，中间不能有空位。家庭和家庭之间可以有空位。
+上车时，一个家庭要么都上车，要么都不上，所以不一定所有B个家庭都能上车。
+每个家庭对于如何坐有自己的喜好，假设某个家庭的成员数是C个，那么对于从1开始坐C个座位和从2开始坐C个座位的喜好打分不同，所以从不同编号的位置开始坐的喜好打分都是不同的，分值是个1到100的任意值。
+如果某个家庭上车了，这个家庭的满意度是这个座位安排下的喜好分值乘以家庭成员数。
+
+要求：找到一个算法，安排B个家庭里面的若干家庭坐车，所有上车的的满意度之和最大。
+
+========================================================
+数据范围：
+1<= 座位数A <= 50
+1<= 家庭数B <= 50
+1<= 家庭成员数N <= 50
+1<= 座位打分 <= 100
+========================================================
+Python 实现：
+实现如下函数 solution(family_sizes, seat_family_scores):
+
+* family_sizes 为家庭人数，如[3, 12, 5]表示共有3个家庭，每个分别有3, 12, 5个人
+* seat_family_scores 为座位评分列表，如[[20, 19, 33], [1, 25, 77]，...], 表示：
+  座位1，家庭1，2，3的满意度分别是20，19，33
+  座位2，家庭1，2，3的满意度分别是1，25，77
+  ...
+* 返回max_score表示最大的满意分数
+========================================================提交版
+#family_sizes = [1,1,4,1,2,4,2]
+#seat_family_scores = [[85,92,2,67,69,22,24],[56,49,62,43,71,22,83],[61,83,92,92,70,3,26],[76,97,39,56,70,8,36],[88,67,71,51,35,54,65],[25,37,76,8,66,25,21],[25,52,6,39,12,16,38],[64,41,77,20,14,98,45],[56,33,47,45,35,26,31],[7,47,30,22,77,67,93]]
+
+import copy
+import datetime
+
+time_stamp = datetime.datetime.now()
+print "time_stamp       " + time_stamp.strftime('%Y.%m.%d-%H:%M:%S')
+
+seat_score_list = []
+total_seat_score_list = []
+family_size_len=len(family_sizes)
+seat_family_scores_len=len(seat_family_scores)
+max_score=0
+
+for i in range(family_size_len):
+    seat_score = [0,0,0,[],0]
+    seat_score[0] = i
+    seat_score[1] = 1
+    seat_score[2] = seat_family_scores[0][i]
+    seat_score[3].append(i)
+    seat_score[4] = seat_family_scores[0][i]
+    seat_score_list.append(seat_score)
+total_seat_score_list.append(seat_score_list)
+
+for i in range(len(seat_family_scores)-1):
+    seat_score_list = []
+    for j in range(len(total_seat_score_list[-1])):                
+        for k in range(family_size_len):            
+            seat_score = [0,0,0,[],0]
+            if k in total_seat_score_list[-1][j][3]:
+                continue
+            else:
+                seat_score = copy.deepcopy(total_seat_score_list[-1][j])
+                if total_seat_score_list[-1][j][1] < family_sizes[total_seat_score_list[-1][j][0]]:
+                    seat_score[1] = seat_score[1] + 1     
+                    seat_score[2] = seat_score[2] + seat_score[4]     
+                else:
+                    if (seat_family_scores_len-i-1) >= family_sizes[k]:
+                        seat_score[0] = k
+                        seat_score[1] = 1
+                        seat_score[2] = seat_score[2] + seat_family_scores[i+1][k]
+                        seat_score[3].append(k)
+                        seat_score[4] = seat_family_scores[i+1][k]
+            if seat_score not in seat_score_list:
+                seat_score_list.append(seat_score)
+    total_seat_score_list.append(seat_score_list)    
+
+for i in total_seat_score_list[-1]:
+    if max_score<i[2]:
+        max_score=i[2]
+
+
+time_stamp = datetime.datetime.now()
+print "time_stamp       " + time_stamp.strftime('%Y.%m.%d-%H:%M:%S')        
+print max_score
+
+========================================================优化版
+#family_sizes = [1,1,4,1,2,4,2]
+#seat_family_scores = [[85,92,2,67,69,22,24],[56,49,62,43,71,22,83],[61,83,92,92,70,3,26],[76,97,39,56,70,8,36],[88,67,71,51,35,54,65],[25,37,76,8,66,25,21],[25,52,6,39,12,16,38],[64,41,77,20,14,98,45],[56,33,47,45,35,26,31],[7,47,30,22,77,67,93]]
+
+#seat_score=(当前的总分,家庭ID,家庭人员，当前增加的分数，家庭历史列表)
+#import copy
+import datetime
+
+time_stamp = datetime.datetime.now()
+print "time_stamp       " + time_stamp.strftime('%Y.%m.%d-%H:%M:%S')
+
+seat_score_list = set()
+#total_seat_score_list = set()
+family_size_len=len(family_sizes)
+seat_family_scores_len=len(seat_family_scores)
+#max_score=0
+
+for i in range(family_size_len):
+    family_history = (i,)
+    seat_score = (seat_family_scores[0][i], i, 1, seat_family_scores[0][i], family_history)
+    seat_score_list.add(seat_score)
+total_seat_score_list=seat_score_list.copy()
+    
+for i in range(1,seat_family_scores_len):
+    seat_score_list = set()
+    for j in total_seat_score_list:
+        for k in range(family_size_len):
+            if k in j[4]:
+                continue
+            else:
+                seat_score = j
+                if j[2] < family_sizes[j[1]]:
+                    seat_score = (seat_score[0]+seat_score[3],seat_score[1],seat_score[2]+1,seat_score[3],seat_score[4])
+                else:
+                    if (seat_family_scores_len-i) >= family_sizes[k]:
+                        family_history = j[4]+(k,)
+                        seat_score = (seat_score[0]+seat_family_scores[i][k],k,1,seat_family_scores[i][k],family_history)
+            seat_score_list.add(seat_score)
+    total_seat_score_list=seat_score_list.copy()
+
+max_score=max(total_seat_score_list)[0]
+
+time_stamp = datetime.datetime.now()
+print "time_stamp       " + time_stamp.strftime('%Y.%m.%d-%H:%M:%S')
+
+print max_score
+
