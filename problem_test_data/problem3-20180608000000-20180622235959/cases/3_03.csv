@@ -1,0 +1,8 @@
+# seat_num, family_num
+# family1_size, family2_size, ....
+# seat1_scores_list(family1-family_num)
+# seat2_scores_list(family1-family_num)
+# ...
+1, 10
+1, 1, 1, 1, 1, 1, 1, 1, 1, 1
+1, 2, 3, 4, 5, 6, 7, 6, 5, 4
