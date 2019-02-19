@@ -1,0 +1,39 @@
+import colorsys
+from PIL import Image
+import cv2
+import time
+
+def get_color(image):
+    color = [0,0,0]
+#    image.save('tmp.jpg')
+    for count, (r, g, b) in image.getcolors(image.size[0] * image.size[1]):
+        hls = colorsys.rgb_to_hls(r / 255.0, g / 255.0, b / 255.0)
+        if hls[2] < 0.20 or hls[1] < 0.50 or hls[1] > 0.90:
+#        if hls[1] < 0.40 or hls[1] > 0.60:
+                continue
+        color = [r+color[0],g+color[1],b+color[2]]
+    return color
+
+if __name__ == "__main__":
+    color_label = ['Red','Green','Blue']
+    cap = cv2.VideoCapture(0)
+    time.sleep(1)
+    ret, frame = cap.read()
+    cv2.imwrite('led.jpg', frame)
+    cap.release()
+
+
+    image = Image.open('led.jpg')
+    led_result =  open('led_result.txt', 'r')
+    lines = led_result.readlines()
+    led_result.close()
+    led_result =  open('led_result.txt', 'w')
+    for line in lines:
+        box = line.split('/')[1].split(',')
+        box_int = [int(x) for x in box]
+        image_box = image.crop(box_int)
+        color = get_color(image_box)
+        color_show = color_label[color.index(max(color))]
+        line = line[:-1]
+        led_result.write(line.split('/')[0] + '/' + line.split('/')[1] +'/'+color_show + '\n')
+    led_result.close()
